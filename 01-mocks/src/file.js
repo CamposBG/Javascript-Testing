@@ -1,10 +1,9 @@
 const { readFile } = require("fs/promises");
-// normalize the path
-const { join } = require("path");
 const { error } = require("./constants");
+const User = require("./user");
 
 // default validation obj
-const DEFAULT_OPTIONS = {
+const DEFAULT_OPTION = {
   maxLines: 3,
   fields: ["id", "name", "profession", "age"],
 };
@@ -14,16 +13,17 @@ class File {
     const content = await File.getFileContent(filePath);
     const validation = File.isValid(content);
     if (!validation.valid) throw new Error(validation.error);
-    return content;
+
+    const users = File.parseCSVToJSON(content);
+
+    return users;
   }
 
   static async getFileContent(filePath) {
-    // concat the current directory with the provided filePah
-    const filename = join(__dirname, filePath);
-    return (await readFile(filename)).toString("utf8");
+    return (await readFile(filePath)).toString("utf8");
   }
 
-  static isValid(csvString, options = DEFAULT_OPTIONS) {
+  static isValid(csvString, options = DEFAULT_OPTION) {
     const [header, ...fileWithoutHeader] = csvString.split("\n");
     const isHeaderValid = header === options.fields.join(",");
     if (!isHeaderValid) {
@@ -33,10 +33,10 @@ class File {
       };
     }
 
-    const isCOntentLengthAccepted =
+    const isContentLengthAccepted =
       fileWithoutHeader.length > 0 &&
       fileWithoutHeader.length <= options.maxLines;
-    if (!isCOntentLengthAccepted) {
+    if (!isContentLengthAccepted) {
       return {
         error: error.FILE_LENGTH_ERROR_MESSAGE,
         valid: false,
@@ -46,10 +46,22 @@ class File {
       valid: true,
     };
   }
+
+  static parseCSVToJSON(csvString) {
+    const lines = csvString.split("\n");
+    //remove the first line and store it in a variable
+    const firstLine = lines.shift();
+    const header = firstLine.split(",");
+    const users = lines.map((line) => {
+      const columns = line.split(",");
+      let user = {};
+      for (const index in columns) {
+        user[header[index]] = columns[index];
+      }
+      return new User(user);
+    });
+    return users;
+  }
 }
 
-(async () => {
-  const result = await File.csvToJson("./../mocks/threeItems-valid.csv");
-  // const result = await File.csvToJson("./../mocks/fourItems-invalid.csv");
-  console.log(result);
-})();
+module.exports = File;
